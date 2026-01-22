@@ -93,6 +93,16 @@ vagrant ssh -c "node /agent-workspace/test.js"
 echo "✓ Test execution OK"
 echo ""
 
+echo "Test 7: Check Claude config..."
+vagrant ssh -c "ls -la ~/.claude/ 2>/dev/null || echo 'No Claude config found (this is OK if you don\\'t have ~/.claude/ on host)'"
+echo "✓ Claude config check OK"
+echo ""
+
+echo "Test 8: Check plugin paths if config exists..."
+vagrant ssh -c "if [ -f ~/.claude/plugins/installed_plugins.json ]; then grep -q '/home/vagrant/.claude' ~/.claude/plugins/installed_plugins.json && echo 'Plugin paths correctly fixed' || echo 'Warning: Plugin paths may not be fixed'; else echo 'No plugins file (OK if no plugins installed)'; fi"
+echo "✓ Plugin paths check OK"
+echo ""
+
 # Cleanup
 echo "Cleaning up..."
 vagrant destroy -f

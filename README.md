@@ -7,6 +7,7 @@ A Vagrant plugin for running Claude Code in an isolated VM sandbox.
 - Ubuntu 24.04 LTS with Docker, Node.js, git pre-installed
 - Automatic Claude Code CLI installation
 - Synced workspace folder and Claude config
+- **Full Claude plugins and skills support** - automatically loads your installed plugins and skills with fixed paths
 - `claude-yolo` wrapper (runs Claude with `--dangerously-skip-permissions`)
 - Customizable VM resources
 
@@ -19,13 +20,6 @@ A Vagrant plugin for running Claude Code in an isolated VM sandbox.
 
 ```bash
 vagrant plugin install vagrant-claude-sandbox
-```
-
-Or from source:
-
-```bash
-gem build vagrant-claude-sandbox.gemspec
-vagrant plugin install vagrant-claude-sandbox-*.gem
 ```
 
 ## Usage
@@ -70,19 +64,19 @@ end
 | `skip_claude_cli_install` | `false` | Skip Claude CLI installation |
 | `additional_packages` | `[]` | Extra apt packages |
 
-## Troubleshooting
+## Plugin and Skills Support
 
-**Plugin not loading**: Run `vagrant plugin list`
-**Provisioning fails**: Check `VBoxManage --version`
-**Config not syncing**: Ensure `~/.claude/` exists
-**Permission issues**: Run `vagrant destroy && vagrant up`
+This plugin automatically copies your `~/.claude/` directory to the VM and fixes absolute paths in plugin configuration files. This means:
 
-## Security
+- All your installed Claude plugins will work in the VM
+- All your custom skills will be available
+- Plugin paths are automatically updated from host paths to VM paths
 
-The VM provides isolation, but note:
-- `claude-yolo` disables permission checks
-- Synced folders can still affect host files
-- Network access is enabled by default
+The plugin configuration files that are updated:
+- `~/.claude/plugins/installed_plugins.json`
+- `~/.claude/plugins/known_marketplaces.json`
+
+This ensures that plugins and skills that reference local file paths will work correctly inside the VM environment.
 
 ## Credits
 

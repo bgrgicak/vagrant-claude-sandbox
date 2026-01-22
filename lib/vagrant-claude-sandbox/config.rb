@@ -61,12 +61,11 @@ module VagrantPlugins
           owner: "vagrant",
           group: "vagrant"
 
-        # Copy Claude config if it exists
+        # Copy Claude config if it exists (using file provisioner to fix plugin paths)
         if File.directory?(@claude_config_path)
-          root_config.vm.synced_folder @claude_config_path, "/home/vagrant/.claude",
-            create: true,
-            owner: "vagrant",
-            group: "vagrant"
+          root_config.vm.provision "file",
+            source: @claude_config_path,
+            destination: "/tmp/claude-config"
         end
 
         # Configure provider (VirtualBox)
@@ -79,7 +78,9 @@ module VagrantPlugins
 
         # Provision the VM
         unless @skip_claude_cli_install
-          root_config.vm.provision "shell", inline: generate_provision_script
+          root_config.vm.provision "shell",
+            inline: generate_provision_script,
+            env: {"HOST_CLAUDE_PATH" => @claude_config_path}
         end
 
         # Configure SSH to auto-cd to workspace
@@ -134,6 +135,24 @@ module VagrantPlugins
             npm install -g @anthropic-ai/claude-code --no-audit
           else
             echo "Claude Code CLI already installed"
+          fi
+
+          # Move Claude configuration from /tmp and fix plugin paths
+          if [ -d "/tmp/claude-config" ]; then
+            echo "Setting up Claude configuration with plugins and skills..."
+            rm -rf /home/vagrant/.claude
+            mv /tmp/claude-config /home/vagrant/.claude
+
+            # Fix absolute paths in plugin configuration files to point to VM paths
+            if [ -f "/home/vagrant/.claude/plugins/installed_plugins.json" ]; then
+              sed -i "s|${HOST_CLAUDE_PATH}|/home/vagrant/.claude|g" /home/vagrant/.claude/plugins/installed_plugins.json
+            fi
+            if [ -f "/home/vagrant/.claude/plugins/known_marketplaces.json" ]; then
+              sed -i "s|${HOST_CLAUDE_PATH}|/home/vagrant/.claude|g" /home/vagrant/.claude/plugins/known_marketplaces.json
+            fi
+
+            chown -R vagrant:vagrant /home/vagrant/.claude
+            echo "Claude plugins and skills loaded successfully!"
           fi
 
           # Create claude-yolo wrapper
