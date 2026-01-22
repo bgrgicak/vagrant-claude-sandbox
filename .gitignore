@@ -28,3 +28,6 @@ vendor/bundle
 # Testing
 Vagrantfile
 !Vagrantfile.example
+
+# Claude AI
+.claude/
