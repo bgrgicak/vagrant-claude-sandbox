@@ -1,0 +1,24 @@
+# Example Vagrantfile showing different configuration options
+
+# Basic usage
+Vagrant.configure("2") do |config|
+  config.claude_sandbox.apply_to!(config)
+end
+
+# Custom configuration example (commented out)
+# Vagrant.configure("2") do |config|
+#   config.claude_sandbox do |sandbox|
+#     # Allocate more resources
+#     sandbox.memory = 8192
+#     sandbox.cpus = 4
+#
+#     # Install additional packages
+#     sandbox.additional_packages = ["vim", "tmux", "htop"]
+#
+#     # Use a different workspace path
+#     sandbox.workspace_path = "/workspace"
+#   end
+#
+#   # Apply the configuration
+#   config.claude_sandbox.apply_to!(config)
+# end
