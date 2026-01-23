@@ -1,24 +1,37 @@
 # Example Vagrantfile showing different configuration options
 
-# Basic usage
+# Docker provider (recommended)
 Vagrant.configure("2") do |config|
+  config.claude_sandbox.provider = "docker"
   config.claude_sandbox.apply_to!(config)
 end
 
-# Custom configuration example (commented out)
+# Docker with custom configuration (commented out)
 # Vagrant.configure("2") do |config|
-#   config.claude_sandbox do |sandbox|
-#     # Allocate more resources
-#     sandbox.memory = 8192
-#     sandbox.cpus = 4
-#
-#     # Install additional packages
-#     sandbox.additional_packages = ["vim", "tmux", "htop"]
-#
-#     # Use a different workspace path
-#     sandbox.workspace_path = "/workspace"
-#   end
-#
-#   # Apply the configuration
+#   config.claude_sandbox.provider = "docker"
+#   config.claude_sandbox.memory = 8192
+#   config.claude_sandbox.cpus = 4
+#   config.claude_sandbox.additional_packages = ["vim", "tmux", "htop"]
+#   # Optional: use a faster mirror if updates are slow in your region
+#   # config.claude_sandbox.ubuntu_mirror = "http://ftp.jaist.ac.jp/pub/Linux/ubuntu-ports"
+#   config.claude_sandbox.apply_to!(config)
+# end
+
+# Docker with custom image (commented out)
+# Vagrant.configure("2") do |config|
+#   config.claude_sandbox.provider = "docker"
+#   config.claude_sandbox.docker_image = "my-ssh-image:latest"
+#   config.claude_sandbox.apply_to!(config)
+# end
+
+# VirtualBox provider - use when you need Docker inside the sandbox
+# or full VM isolation (commented out)
+# Vagrant.configure("2") do |config|
+#   config.claude_sandbox.provider = "virtualbox"
+#   config.claude_sandbox.memory = 8192
+#   config.claude_sandbox.cpus = 4
+#   config.claude_sandbox.additional_packages = ["vim", "tmux", "htop"]
+#   # Optional: use a faster mirror if updates are slow in your region
+#   # config.claude_sandbox.ubuntu_mirror = "http://ftp.jaist.ac.jp/pub/Linux/ubuntu-ports"
 #   config.claude_sandbox.apply_to!(config)
 # end
