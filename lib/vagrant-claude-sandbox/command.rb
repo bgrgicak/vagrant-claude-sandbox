@@ -27,7 +27,8 @@ module VagrantPlugins
           workspace_path = config.workspace_path || "/agent-workspace"
 
           # Build the command to run
-          command = "cd #{workspace_path}; . ~/.nvm/nvm.sh && exec claude --dangerously-skip-permissions --chrome"
+          # Source nvm only if needed (claude might already be in PATH)
+          command = "cd #{workspace_path}; [ -f ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; exec claude --dangerously-skip-permissions --chrome"
 
           # Execute SSH with the command
           machine.action(:ssh_run, ssh_run_command: command, ssh_opts: { extra_args: ["-t"] })
