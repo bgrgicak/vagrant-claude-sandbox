@@ -33,7 +33,7 @@ module VagrantPlugins
         @claude_config_path = File.expand_path("~/.claude/") if @claude_config_path == UNSET_VALUE
         @skip_claude_cli_install = false if @skip_claude_cli_install == UNSET_VALUE
         @additional_packages = [] if @additional_packages == UNSET_VALUE
-        @provider = "virtualbox" if @provider == UNSET_VALUE
+        @provider = "docker" if @provider == UNSET_VALUE
         @docker_image = nil if @docker_image == UNSET_VALUE
         @ubuntu_mirror = nil if @ubuntu_mirror == UNSET_VALUE
       end
@@ -72,7 +72,7 @@ module VagrantPlugins
         # Vagrant will choose the appropriate one based on:
         # 1. --provider flag from command line
         # 2. Existing .vagrant directory state
-        # 3. Default provider (VirtualBox)
+        # 3. Default provider (Docker)
         apply_virtualbox_config!(root_config)
         apply_docker_config!(root_config)
 
@@ -96,8 +96,19 @@ module VagrantPlugins
             destination: "/tmp/claude-config"
         end
 
+        # Copy claude-notify script to VM
+        claude_notify_script = File.expand_path("../scripts/claude-notify", __FILE__)
+        if File.exist?(claude_notify_script)
+          root_config.vm.provision "file",
+            source: claude_notify_script,
+            destination: "/tmp/claude-notify"
+        end
+
         # Configure SSH port with auto-correction for conflicts
         root_config.vm.network :forwarded_port, guest: 22, host: 2200, id: "ssh", auto_correct: true
+
+        # Forward notification port from host to guest (guest can send notifications to host)
+        root_config.vm.network :forwarded_port, guest: 29325, host: 29325, id: "notifications", host_ip: "127.0.0.1"
       end
 
       def apply_virtualbox_config!(root_config)
@@ -172,6 +183,10 @@ module VagrantPlugins
             lsb-release \
             git \
             unzip \
+            libnotify-bin \
+            dbus-x11 \
+            inotify-tools \
+            netcat-openbsd \
             #{additional_packages}
 
           #{docker_install_script}
@@ -221,6 +236,80 @@ module VagrantPlugins
 
             chown -R vagrant:vagrant /home/vagrant/.claude
             echo "Claude plugins and skills loaded successfully!"
+          fi
+
+          # Set up notification forwarding to host
+          echo "Setting up notification forwarding to host..."
+
+          # Backup original notify-send if it exists
+          if [ -f /usr/bin/notify-send ]; then
+            mv /usr/bin/notify-send /usr/bin/notify-send.real
+          fi
+
+          # Create wrapper script that forwards to host
+          cat > /usr/bin/notify-send << 'NOTIFY_EOF'
+#!/bin/bash
+# Wrapper script to forward notifications to host
+
+TITLE=""
+MESSAGE=""
+HOST_PORT=29325
+
+# Parse notify-send arguments (simplified)
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    -u|--urgency)
+      shift 2
+      ;;
+    -t|--expire-time)
+      shift 2
+      ;;
+    -i|--icon)
+      shift 2
+      ;;
+    -c|--category)
+      shift 2
+      ;;
+    *)
+      if [ -z "$TITLE" ]; then
+        TITLE="$1"
+      elif [ -z "$MESSAGE" ]; then
+        MESSAGE="$1"
+      fi
+      shift
+      ;;
+  esac
+done
+
+# Default message if not provided
+[ -z "$MESSAGE" ] && MESSAGE="$TITLE" && TITLE="Notification"
+
+# Try host.docker.internal first (Docker), then fall back to 10.0.2.2 (VirtualBox)
+for HOST_IP in host.docker.internal 10.0.2.2; do
+  if echo "NOTIFY|$TITLE|$MESSAGE" | nc -w 1 $HOST_IP $HOST_PORT > /dev/null 2>&1; then
+    exit 0
+  fi
+done
+
+# Fall back to local notification if host server not available
+if [ -f /usr/bin/notify-send.real ]; then
+  exec /usr/bin/notify-send.real "$TITLE" "$MESSAGE"
+fi
+
+# If all else fails, just log it
+logger "Notification: $TITLE - $MESSAGE"
+NOTIFY_EOF
+
+          chmod +x /usr/bin/notify-send
+          echo "Notification forwarding configured!"
+
+          # Install claude-notify helper script
+          if [ -f "/tmp/claude-notify" ]; then
+            echo "Installing claude-notify helper script..."
+            mv /tmp/claude-notify /usr/local/bin/claude-notify
+            chmod +x /usr/local/bin/claude-notify
+            chown root:root /usr/local/bin/claude-notify
+            echo "claude-notify installed successfully!"
           fi
 
           echo "Claude sandbox environment setup complete!"

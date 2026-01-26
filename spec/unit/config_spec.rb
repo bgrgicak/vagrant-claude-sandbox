@@ -35,8 +35,8 @@ describe VagrantPlugins::ClaudeSandbox::Config do
       expect(subject.additional_packages).to eq([])
     end
 
-    it "sets default provider to virtualbox" do
-      expect(subject.provider).to eq("virtualbox")
+    it "sets default provider to docker" do
+      expect(subject.provider).to eq("docker")
     end
 
     it "sets default docker_image to nil" do
@@ -67,10 +67,10 @@ describe VagrantPlugins::ClaudeSandbox::Config do
       expect(subject.workspace_path).to eq("/custom-workspace")
     end
 
-    it "allows setting custom provider to docker" do
-      subject.provider = "docker"
+    it "allows setting custom provider to virtualbox" do
+      subject.provider = "virtualbox"
       subject.finalize!
-      expect(subject.provider).to eq("docker")
+      expect(subject.provider).to eq("virtualbox")
     end
 
     it "allows setting custom docker_image" do
