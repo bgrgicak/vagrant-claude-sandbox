@@ -1,6 +1,9 @@
 require_relative "path_fixer"
 require 'fileutils'
 
+# Set Docker as the default provider unless already specified
+ENV['VAGRANT_DEFAULT_PROVIDER'] ||= 'docker'
+
 # Fix Docker PATH issues immediately when plugin loads (before Vagrant initialization)
 VagrantPlugins::ClaudeSandbox::PathFixer.fix_docker_path!
 
