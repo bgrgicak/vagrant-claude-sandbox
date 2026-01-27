@@ -28,6 +28,7 @@ vendor/bundle
 # Testing
 Vagrantfile
 !Vagrantfile.example
+.vagrant-claude-sandbox/notification_config.yml
 
 # Claude AI
 .claude/

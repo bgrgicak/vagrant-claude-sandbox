@@ -1,0 +1,29 @@
+# Notification Configuration for vagrant-claude-sandbox
+# Copy this file to ~/.vagrant-claude-sandbox/notification_config.yml to customize
+
+# Which notification types to show
+# Types: info, success, error, warning, needs_input, task_complete, task_start
+show_types:
+  - task_complete
+  - needs_input
+  - error
+  - warning
+
+# Default timeout in seconds (0 = permanent until dismissed)
+default_timeout: 0
+
+# Override timeout for specific types (in seconds)
+type_timeouts:
+  info: 10
+  success: 15
+  error: 0       # Errors stay until dismissed
+  warning: 0     # Warnings stay until dismissed
+  needs_input: 0 # User input needed stays until dismissed
+  task_complete: 0  # Task completions stay until dismissed
+  task_start: 5  # Task starts auto-dismiss after 5s
+
+# Enable sound for notifications
+enable_sound: false
+
+# Only show notifications with URLs (e.g., link to conversation)
+require_url: false

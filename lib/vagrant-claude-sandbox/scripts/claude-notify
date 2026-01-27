@@ -1,0 +1,295 @@
+#!/bin/bash
+# Claude Code notification helper
+# Sends rich notifications with project context and optional URLs
+
+# Don't use set -e because we handle non-zero exit codes explicitly
+set +e
+
+# Configuration
+HOST_PORT=29325
+NOTIFICATION_TIMEOUT=1
+
+# Colors for terminal output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Usage information
+usage() {
+    cat << EOF
+Usage: claude-notify [OPTIONS] TITLE [MESSAGE]
+
+Send a notification from Claude Code to the host machine.
+
+OPTIONS:
+    -u, --url URL              Add clickable URL to notification
+    -s, --session ID           Add session/conversation ID
+    -p, --project PATH         Project path (default: current directory)
+    -t, --timeout SECONDS      How long notification stays visible (default: from config)
+    --type TYPE                Notification type (default: auto-detect)
+    -h, --help                 Show this help message
+
+NOTIFICATION TYPES:
+    info           - General information (default)
+    success        - Success messages
+    error          - Error messages (high priority)
+    warning        - Warning messages (high priority)
+    needs_input    - Claude needs user input (high priority)
+    task_complete  - Task completed (default shown)
+    task_start     - Task started (default filtered)
+
+DEFAULT BEHAVIOR:
+    - Only task_complete, needs_input, error, warning shown
+    - Notifications are permanent (stay until dismissed)
+    - Configure in ~/.vagrant-claude-sandbox/notification_config.yml
+
+EXAMPLES:
+    # Task completion (shown by default)
+    claude-notify "Build Complete" "All tests passed!"
+
+    # Task completion with URL
+    claude-notify --type task_complete -u "https://claude.ai/chat/abc" "Done" "Ready for review"
+
+    # Needs input (shown by default)
+    claude-notify --type needs_input "Input Required" "Which API endpoint to use?"
+
+    # Task start (filtered by default)
+    claude-notify --type task_start "Building" "Starting build process..."
+
+    # Error (shown by default, permanent)
+    claude-notify --type error "Build Failed" "Check line 42"
+
+ENVIRONMENT VARIABLES:
+    CLAUDE_SESSION_ID       Current Claude conversation ID
+    CLAUDE_SESSION_URL      Direct URL to current conversation
+    CLAUDE_PROJECT_PATH     Current project directory
+
+EOF
+    exit 0
+}
+
+# Parse arguments
+TITLE=""
+MESSAGE=""
+URL=""
+SESSION_ID=""
+TIMEOUT=""
+TYPE=""
+
+# Default to workspace directory if we're in /home/vagrant
+if [ "$PWD" = "/home/vagrant" ] && [ -d "/agent-workspace" ]; then
+    PROJECT_PATH="${CLAUDE_PROJECT_PATH:-/agent-workspace}"
+else
+    PROJECT_PATH="${CLAUDE_PROJECT_PATH:-$PWD}"
+fi
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        -h|--help)
+            usage
+            ;;
+        -u|--url)
+            URL="$2"
+            shift 2
+            ;;
+        -s|--session)
+            SESSION_ID="$2"
+            shift 2
+            ;;
+        -p|--project)
+            PROJECT_PATH="$2"
+            shift 2
+            ;;
+        -t|--timeout)
+            TIMEOUT="$2"
+            shift 2
+            ;;
+        --type)
+            TYPE="$2"
+            shift 2
+            ;;
+        *)
+            if [ -z "$TITLE" ]; then
+                TITLE="$1"
+            elif [ -z "$MESSAGE" ]; then
+                MESSAGE="$1"
+            else
+                echo -e "${RED}Error: Too many arguments${NC}" >&2
+                echo "Run 'claude-notify --help' for usage information" >&2
+                exit 1
+            fi
+            shift
+            ;;
+    esac
+done
+
+# Validate required arguments
+if [ -z "$TITLE" ]; then
+    echo -e "${RED}Error: TITLE is required${NC}" >&2
+    echo "Run 'claude-notify --help' for usage information" >&2
+    exit 1
+fi
+
+# Use title as message if no message provided
+if [ -z "$MESSAGE" ]; then
+    MESSAGE="$TITLE"
+fi
+
+# Try to get session info from environment if not provided
+if [ -z "$URL" ]; then
+    if [ -n "$CLAUDE_SESSION_URL" ]; then
+        URL="$CLAUDE_SESSION_URL"
+    elif [ -n "$SESSION_ID" ]; then
+        # Construct URL from session ID
+        URL="https://claude.ai/chat/${SESSION_ID}"
+    elif [ -n "$CLAUDE_SESSION_ID" ]; then
+        URL="https://claude.ai/chat/${CLAUDE_SESSION_ID}"
+    fi
+fi
+
+# Detect project name intelligently
+detect_project_name() {
+    local path="$1"
+    local name=""
+
+    # Try git remote first
+    if [ -d "$path/.git" ]; then
+        name=$(cd "$path" && git remote get-url origin 2>/dev/null | sed -E 's/.*\/(.+)(\.git)?$/\1/' | sed 's/\.git$//')
+    fi
+
+    # Try package.json
+    if [ -z "$name" ] && [ -f "$path/package.json" ]; then
+        name=$(grep -o '"name"[[:space:]]*:[[:space:]]*"[^"]*"' "$path/package.json" 2>/dev/null | head -1 | sed 's/"name"[[:space:]]*:[[:space:]]*"\([^"]*\)"/\1/')
+    fi
+
+    # Try Cargo.toml
+    if [ -z "$name" ] && [ -f "$path/Cargo.toml" ]; then
+        name=$(grep -o 'name[[:space:]]*=[[:space:]]*"[^"]*"' "$path/Cargo.toml" 2>/dev/null | head -1 | sed 's/name[[:space:]]*=[[:space:]]*"\([^"]*\)"/\1/')
+    fi
+
+    # Fall back to directory name
+    if [ -z "$name" ]; then
+        name=$(basename "$path")
+    fi
+
+    echo "$name"
+}
+
+# Auto-detect notification type from message content
+detect_type() {
+    local title="$1"
+    local message="$2"
+    local combined="$title $message"
+
+    # Check for needs input keywords
+    if echo "$combined" | grep -qiE "(input|choose|select|confirm|approve|review|check|question)"; then
+        echo "needs_input"
+        return
+    fi
+
+    # Check for error keywords
+    if echo "$combined" | grep -qiE "(error|fail|failed|exception|critical|crash)"; then
+        echo "error"
+        return
+    fi
+
+    # Check for warning keywords
+    if echo "$combined" | grep -qiE "(warning|warn|deprecated|caution|alert)"; then
+        echo "warning"
+        return
+    fi
+
+    # Check for task complete keywords
+    if echo "$combined" | grep -qiE "(complete|completed|done|finished|success|passed|ready)"; then
+        echo "task_complete"
+        return
+    fi
+
+    # Check for task start keywords
+    if echo "$combined" | grep -qiE "(start|starting|begin|beginning|running|processing)"; then
+        echo "task_start"
+        return
+    fi
+
+    # Check for success keywords
+    if echo "$combined" | grep -qiE "(success|successful|ok|okay)"; then
+        echo "success"
+        return
+    fi
+
+    # Default to info
+    echo "info"
+}
+
+# Enhance message with project context
+PROJECT_NAME=$(detect_project_name "$PROJECT_PATH")
+# Don't use newlines - they don't render properly
+# Add project name to the title instead
+ENHANCED_TITLE="[${PROJECT_NAME}] ${TITLE}"
+ENHANCED_MESSAGE="${MESSAGE}"
+
+# Auto-detect type if not specified
+if [ -z "$TYPE" ]; then
+    TYPE=$(detect_type "$TITLE" "$MESSAGE")
+fi
+
+# Timeout defaults to empty (server will use configured default)
+if [ -z "$TIMEOUT" ]; then
+    TIMEOUT=""
+fi
+
+# Determine host IP (Docker vs VirtualBox)
+detect_host() {
+    # Try host.docker.internal first (Docker)
+    if getent hosts host.docker.internal > /dev/null 2>&1; then
+        echo "host.docker.internal"
+        return 0
+    fi
+    # Fall back to VirtualBox gateway
+    echo "10.0.2.2"
+}
+
+HOST_IP=$(detect_host)
+
+# Send notification
+send_notification() {
+    local payload="NOTIFY|${ENHANCED_TITLE}|${ENHANCED_MESSAGE}|${URL:-}|${TIMEOUT}|${TYPE}"
+
+    local response=$(echo "$payload" | nc -w "$NOTIFICATION_TIMEOUT" "$HOST_IP" "$HOST_PORT" 2>&1)
+
+    if [ "$response" = "OK" ]; then
+        return 0
+    elif [ "$response" = "FILTERED" ]; then
+        return 2  # Filtered by server config
+    else
+        return 1  # Connection failed
+    fi
+}
+
+# Try to send notification
+send_notification
+result=$?
+
+if [ $result -eq 0 ]; then
+    echo -e "${GREEN}✓${NC} Notification sent to host [${TYPE}]"
+    [ -n "$URL" ] && echo -e "  ${YELLOW}🔗${NC} Clickable URL: $URL"
+    [ -n "$TIMEOUT" ] && echo -e "  ⏱  Timeout: ${TIMEOUT}s"
+    exit 0
+elif [ $result -eq 2 ]; then
+    echo -e "${YELLOW}○${NC} Notification filtered by server config [${TYPE}]"
+    exit 0
+else
+    echo -e "${YELLOW}⚠${NC} Could not reach notification server on host" >&2
+    echo -e "  Make sure ${GREEN}vagrant-notify-server${NC} is running on your host machine" >&2
+    echo -e "  Notification: ${TITLE} - ${MESSAGE}" >&2
+
+    # Fall back to local notification if available
+    if [ -f /usr/bin/notify-send.real ]; then
+        /usr/bin/notify-send.real "$TITLE" "$MESSAGE" 2>/dev/null || true
+    fi
+
+    # Log to syslog as last resort
+    logger "Claude Notification: $TITLE - $MESSAGE"
+    exit 1
+fi

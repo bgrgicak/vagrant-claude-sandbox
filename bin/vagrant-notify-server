@@ -1,0 +1,10 @@
+#!/usr/bin/env ruby
+
+# Add lib directory to load path
+$LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
+
+require 'vagrant-claude-sandbox/notification_server'
+
+port = ARGV[0] ? ARGV[0].to_i : VagrantPlugins::ClaudeSandbox::NotificationServer::DEFAULT_PORT
+server = VagrantPlugins::ClaudeSandbox::NotificationServer.new(port)
+server.start

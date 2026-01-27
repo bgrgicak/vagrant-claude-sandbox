@@ -19,11 +19,15 @@ Gem::Specification.new do |spec|
   spec.files = Dir[
     "lib/**/*.rb",
     "lib/docker/Dockerfile",
+    "lib/vagrant-claude-sandbox/scripts/*",
+    "lib/vagrant-claude-sandbox/*.example",
+    "bin/*",
     "README.md",
     "LICENSE"
   ]
 
   spec.require_paths = ["lib"]
+  spec.executables = ["vagrant-notify-server"]
 
   spec.add_development_dependency "rake", "~> 13.0"
   spec.add_development_dependency "rspec", "~> 3.12"

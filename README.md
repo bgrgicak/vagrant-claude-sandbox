@@ -125,6 +125,14 @@ end
 
 **Security note:** Only use mirrors from trusted sources. The official Ubuntu mirror is always the safest option.
 
+## Notifications
+
+Vagrant uses the `vagrant-notify-server` gem to provide desktop notifications from Claude.
+To display notifications on your OS, [install `terminal-notifier` on MacOS](https://formulae.brew.sh/formula/terminal-notifier) or `libnotify-bin` on Linux (untested).
+
+By default notifications appear when Claude completes tasks or needs input.
+To customize notification behavior: Copy lib/vagrant-claude-sandbox/notification_config.yml.example to ~/.vagrant-claude-sandbox/notification_config.yml to configure which notifications appear.
+
 ## Development and Testing
 
 ### Running Tests
