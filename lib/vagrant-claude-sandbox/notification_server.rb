@@ -6,6 +6,7 @@ module VagrantPlugins
   module ClaudeSandbox
     class NotificationServer
       DEFAULT_PORT = 29325
+      PORT_FILE = ".vagrant-notification-port"
       DEFAULT_CONFIG = {
         'show_types' => ['task_complete', 'needs_input', 'error', 'warning'],
         'default_timeout' => 0,
@@ -22,10 +23,19 @@ module VagrantPlugins
         'require_url' => false
       }
 
-      def initialize(port = DEFAULT_PORT)
-        @port = port
+      def initialize(port = nil)
+        @port = port || detect_port
         @server = nil
         @config = load_config
+      end
+
+      def detect_port
+        # Check for port file in current directory (written by vagrant trigger)
+        if File.exist?(PORT_FILE)
+          port = File.read(PORT_FILE).strip.to_i
+          return port if port > 0
+        end
+        DEFAULT_PORT
       end
 
       def load_config

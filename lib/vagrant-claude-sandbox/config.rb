@@ -108,7 +108,37 @@ module VagrantPlugins
         root_config.vm.network :forwarded_port, guest: 22, host: 2200, id: "ssh", auto_correct: true
 
         # Forward notification port from host to guest (guest can send notifications to host)
-        root_config.vm.network :forwarded_port, guest: 29325, host: 29325, id: "notifications", host_ip: "127.0.0.1"
+        # Use auto_correct to handle port conflicts
+        root_config.vm.network :forwarded_port, guest: 29325, host: 29325, id: "notifications", host_ip: "127.0.0.1", auto_correct: true
+
+        # Write the actual notification port to a file after VM is up so scripts can read it
+        root_config.trigger.after :up do |trigger|
+          trigger.ruby do |env, machine|
+            # Get the actual forwarded port for notifications
+            ports = machine.provider.driver.read_forwarded_ports rescue []
+            notification_port = nil
+
+            # Find the notification port mapping
+            ports.each do |port_info|
+              # Format varies by provider, handle both
+              if port_info.is_a?(Array) && port_info.length >= 4
+                # VirtualBox format: [name, guest_port, host_port, host_ip]
+                notification_port = port_info[2] if port_info[1] == 29325
+              elsif port_info.is_a?(Hash)
+                notification_port = port_info[:host] if port_info[:guest] == 29325
+              end
+            end
+
+            # Default to 29325 if we couldn't detect
+            notification_port ||= 29325
+
+            # Write port to workspace config file
+            workspace = machine.config.claude_sandbox.workspace_path rescue "/agent-workspace"
+            port_file = File.join(Dir.pwd, ".vagrant-notification-port")
+            File.write(port_file, notification_port.to_s)
+            machine.ui.info("Notification server port: #{notification_port}")
+          end
+        end
       end
 
       def apply_virtualbox_config!(root_config)
@@ -253,7 +283,13 @@ module VagrantPlugins
 
 TITLE=""
 MESSAGE=""
-HOST_PORT=29325
+
+# Read port from config file (written by vagrant trigger), default to 29325
+if [ -f "/agent-workspace/.vagrant-notification-port" ]; then
+    HOST_PORT=$(cat /agent-workspace/.vagrant-notification-port)
+else
+    HOST_PORT=29325
+fi
 
 # Parse notify-send arguments (simplified)
 while [[ $# -gt 0 ]]; do

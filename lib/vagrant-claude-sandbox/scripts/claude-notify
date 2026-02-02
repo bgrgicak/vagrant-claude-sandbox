@@ -6,7 +6,12 @@
 set +e
 
 # Configuration
-HOST_PORT=29325
+# Read port from config file (written by vagrant trigger), default to 29325
+if [ -f "/agent-workspace/.vagrant-notification-port" ]; then
+    HOST_PORT=$(cat /agent-workspace/.vagrant-notification-port)
+else
+    HOST_PORT=29325
+fi
 NOTIFICATION_TIMEOUT=1
 
 # Colors for terminal output

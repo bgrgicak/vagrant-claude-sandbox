@@ -5,6 +5,8 @@ $LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
 
 require 'vagrant-claude-sandbox/notification_server'
 
-port = ARGV[0] ? ARGV[0].to_i : VagrantPlugins::ClaudeSandbox::NotificationServer::DEFAULT_PORT
+# If port specified on command line, use it. Otherwise, let auto-detection work
+# (reads from .vagrant-notification-port if present, otherwise uses default)
+port = ARGV[0] ? ARGV[0].to_i : nil
 server = VagrantPlugins::ClaudeSandbox::NotificationServer.new(port)
 server.start
