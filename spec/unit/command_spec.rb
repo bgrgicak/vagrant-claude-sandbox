@@ -31,7 +31,7 @@ describe VagrantPlugins::ClaudeSandbox::Command do
         expect(machine).to receive(:action).with(
           :ssh_run,
           hash_including(
-            ssh_run_command: "cd /agent-workspace; . ~/.nvm/nvm.sh && exec claude --dangerously-skip-permissions --chrome",
+            ssh_run_command: "cd /agent-workspace; [ -f ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; exec claude --dangerously-skip-permissions --chrome",
             ssh_opts: { extra_args: ["-t"] }
           )
         )
@@ -50,7 +50,7 @@ describe VagrantPlugins::ClaudeSandbox::Command do
         expect(machine).to receive(:action).with(
           :ssh_run,
           hash_including(
-            ssh_run_command: "cd /custom-workspace; . ~/.nvm/nvm.sh && exec claude --dangerously-skip-permissions --chrome",
+            ssh_run_command: "cd /custom-workspace; [ -f ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; exec claude --dangerously-skip-permissions --chrome",
             ssh_opts: { extra_args: ["-t"] }
           )
         )
@@ -69,7 +69,7 @@ describe VagrantPlugins::ClaudeSandbox::Command do
         expect(machine).to receive(:action).with(
           :ssh_run,
           hash_including(
-            ssh_run_command: "cd /agent-workspace; . ~/.nvm/nvm.sh && exec claude --dangerously-skip-permissions --chrome",
+            ssh_run_command: "cd /agent-workspace; [ -f ~/.nvm/nvm.sh ] && . ~/.nvm/nvm.sh; exec claude --dangerously-skip-permissions --chrome",
             ssh_opts: { extra_args: ["-t"] }
           )
         )

@@ -239,6 +239,8 @@ describe VagrantPlugins::ClaudeSandbox::Config do
     let(:vm_config) { double("vm_config") }
     let(:vb_provider) { double("virtualbox_provider") }
     let(:docker_provider) { double("docker_provider") }
+    let(:trigger_config) { double("trigger_config") }
+    let(:trigger) { double("trigger") }
 
     before do
       allow(root_config).to receive(:vm).and_return(vm_config)
@@ -258,6 +260,11 @@ describe VagrantPlugins::ClaudeSandbox::Config do
       allow(docker_provider).to receive(:remains_running=)
       allow(docker_provider).to receive(:create_args=)
       allow(File).to receive(:directory?).and_return(false)
+
+      # Mock trigger configuration
+      allow(root_config).to receive(:trigger).and_return(trigger_config)
+      allow(trigger_config).to receive(:after).and_yield(trigger)
+      allow(trigger).to receive(:ruby)
     end
 
     it "configures synced folder for workspace" do
