@@ -107,36 +107,74 @@ module VagrantPlugins
         # Configure SSH port with auto-correction for conflicts
         root_config.vm.network :forwarded_port, guest: 22, host: 2200, id: "ssh", auto_correct: true
 
-        # Forward notification port from host to guest (guest can send notifications to host)
-        # Use auto_correct to handle port conflicts
-        root_config.vm.network :forwarded_port, guest: 29325, host: 29325, id: "notifications", host_ip: "127.0.0.1", auto_correct: true
+        # Note: No port forwarding needed for notifications.
+        # The guest connects OUT to the host notification server:
+        # - Docker: via host.docker.internal:29325
+        # - VirtualBox: via 10.0.2.2:29325 (NAT gateway)
+        # Port forwarding is for host->guest, but notifications are guest->host.
 
-        # Write the actual notification port to a file after VM is up so scripts can read it
+        # Write the notification port to a file so scripts can read it
         root_config.trigger.after :up do |trigger|
           trigger.ruby do |env, machine|
-            # Get the actual forwarded port for notifications
-            ports = machine.provider.driver.read_forwarded_ports rescue []
-            notification_port = nil
-
-            # Find the notification port mapping
-            ports.each do |port_info|
-              # Format varies by provider, handle both
-              if port_info.is_a?(Array) && port_info.length >= 4
-                # VirtualBox format: [name, guest_port, host_port, host_ip]
-                notification_port = port_info[2] if port_info[1] == 29325
-              elsif port_info.is_a?(Hash)
-                notification_port = port_info[:host] if port_info[:guest] == 29325
-              end
-            end
-
-            # Default to 29325 if we couldn't detect
-            notification_port ||= 29325
-
-            # Write port to workspace config file
-            workspace = machine.config.claude_sandbox.workspace_path rescue "/agent-workspace"
+            notification_port = 29325
             port_file = File.join(Dir.pwd, ".vagrant-notification-port")
             File.write(port_file, notification_port.to_s)
             machine.ui.info("Notification server port: #{notification_port}")
+
+            # Auto-start notification server if not already running
+            unless system("lsof -i :#{notification_port} > /dev/null 2>&1")
+              # Find the gem's bin directory
+              gem_dir = File.expand_path("../..", __dir__)
+              server_bin = File.join(gem_dir, "bin", "vagrant-notify-server")
+              gemfile = File.join(gem_dir, "Gemfile")
+
+              if File.exist?(server_bin)
+                machine.ui.info("Starting notification server...")
+
+                # Use bundle exec in development mode, plain ruby when installed as gem
+                cmd = if File.exist?(gemfile)
+                  ["bundle", "exec", "ruby", server_bin, notification_port.to_s]
+                else
+                  ["ruby", server_bin, notification_port.to_s]
+                end
+
+                # Start server in background
+                pid = spawn(
+                  *cmd,
+                  chdir: gem_dir,
+                  out: File.join(Dir.pwd, ".vagrant-notify-server.log"),
+                  err: File.join(Dir.pwd, ".vagrant-notify-server.log")
+                )
+                Process.detach(pid)
+
+                # Save PID for cleanup
+                File.write(File.join(Dir.pwd, ".vagrant-notify-server-pid"), pid.to_s)
+                machine.ui.success("Notification server started (PID: #{pid})")
+              else
+                machine.ui.warn("Notification server not found at: #{server_bin}")
+                machine.ui.warn("Run manually: bundle exec bin/vagrant-notify-server")
+              end
+            else
+              machine.ui.info("Notification server already running on port #{notification_port}")
+            end
+          end
+        end
+
+        # Stop notification server on halt/destroy
+        root_config.trigger.after [:halt, :destroy] do |trigger|
+          trigger.ruby do |env, machine|
+            pid_file = File.join(Dir.pwd, ".vagrant-notify-server-pid")
+            if File.exist?(pid_file)
+              pid = File.read(pid_file).strip.to_i
+              begin
+                Process.kill("INT", pid)
+                machine.ui.info("Stopped notification server (PID: #{pid})")
+              rescue Errno::ESRCH
+                # Process already stopped
+              ensure
+                File.delete(pid_file)
+              end
+            end
           end
         end
       end

@@ -30,5 +30,10 @@ Vagrantfile
 !Vagrantfile.example
 .vagrant-claude-sandbox/notification_config.yml
 
+# Notification server runtime files
+.vagrant-notification-port
+.vagrant-notify-server-pid
+.vagrant-notify-server.log
+
 # Claude AI
 .claude/

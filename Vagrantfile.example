@@ -1,4 +1,13 @@
 # Example Vagrantfile showing different configuration options
+#
+# Notifications:
+# The plugin automatically starts a notification server when you run `vagrant up`.
+# Install terminal-notifier on macOS for desktop notifications:
+#   brew install terminal-notifier
+# Customize notifications by copying:
+#   lib/vagrant-claude-sandbox/notification_config.yml.example
+# to:
+#   ~/.vagrant-claude-sandbox/notification_config.yml
 
 # Docker provider (recommended)
 Vagrant.configure("2") do |config|

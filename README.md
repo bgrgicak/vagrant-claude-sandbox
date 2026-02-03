@@ -127,11 +127,33 @@ end
 
 ## Notifications
 
-Vagrant uses the `vagrant-notify-server` gem to provide desktop notifications from Claude.
-To display notifications on your OS, [install `terminal-notifier` on MacOS](https://formulae.brew.sh/formula/terminal-notifier) or `libnotify-bin` on Linux (untested).
+The plugin automatically starts a notification server when you run `vagrant up`, enabling desktop notifications from Claude running in the sandbox.
 
-By default notifications appear when Claude completes tasks or needs input.
-To customize notification behavior: Copy lib/vagrant-claude-sandbox/notification_config.yml.example to ~/.vagrant-claude-sandbox/notification_config.yml to configure which notifications appear.
+**Setup:**
+
+1. Install notification support on your OS:
+   - **macOS**: `brew install terminal-notifier`
+   - **Linux**: `apt install libnotify-bin` (untested)
+
+2. The notification server starts automatically with `vagrant up` and stops with `vagrant halt` or `vagrant destroy`.
+
+**Customization:**
+
+By default, notifications appear when Claude completes tasks, needs input, or encounters errors/warnings.
+
+To customize notification behavior, copy the example config:
+```bash
+cp lib/vagrant-claude-sandbox/notification_config.yml.example ~/.vagrant-claude-sandbox/notification_config.yml
+```
+
+Then edit `~/.vagrant-claude-sandbox/notification_config.yml` to configure which notification types to show, timeouts, sounds, etc.
+
+**Manual Control:**
+
+If needed, you can manually run the notification server:
+```bash
+bundle exec bin/vagrant-notify-server
+```
 
 ## Development and Testing
 
