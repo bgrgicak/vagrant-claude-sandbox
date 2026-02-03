@@ -86,7 +86,11 @@ fi
 
 echo ""
 echo "Bumping version from ${OLD_VERSION} to ${NEW_VERSION}..."
-sed -i "s/VERSION = \"${OLD_VERSION}\"/VERSION = \"${NEW_VERSION}\"/" "$VERSION_FILE"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  sed -i '' "s/VERSION = \"${OLD_VERSION}\"/VERSION = \"${NEW_VERSION}\"/" "$VERSION_FILE"
+else
+  sed -i "s/VERSION = \"${OLD_VERSION}\"/VERSION = \"${NEW_VERSION}\"/" "$VERSION_FILE"
+fi
 echo "Updated ${VERSION_FILE}"
 
 # Verify the version was updated correctly
